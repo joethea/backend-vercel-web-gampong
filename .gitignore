@@ -1,0 +1,15 @@
+# Node modules (folder besar, auto install di server)
+node_modules/
+
+# Environment file (berisi key rahasia, jangan pernah upload)
+.env
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS & Editor files
+.DS_Store
+.vscode/
+.idea/
