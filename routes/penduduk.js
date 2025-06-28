@@ -51,6 +51,43 @@ router.delete('/:nik', async (req, res) => {
 });
 
 
+
+// CREATE / Tambah data penduduk
+router.post('/', async (req, res) => {
+  const data = req.body;
+
+  console.log('📥 Permintaan tambah data baru:');
+  console.log(data);
+
+  if (!data || !data.nik || !data.nama) {
+    return res.status(400).json({ error: '❌ Data wajib diisi minimal NIK dan Nama' });
+  }
+
+  try {
+    const hasil = await supabase.from('penduduk').insert([data]);
+
+    if (hasil.error) {
+  console.error('❌ Gagal tambah:', hasil.error.message);
+
+  if (hasil.error.message.includes('duplicate key value') && hasil.error.message.includes('penduduk_nik_key')) {
+    return res.status(400).json({ error: '❌ NIK sudah ada di database' });
+  }
+
+  return res.status(500).json({ error: '❌ Gagal menyimpan data ke database' });
+}
+
+
+    res.json({ message: '✅ Data berhasil ditambahkan', data: hasil.data?.[0] || data });
+
+  } catch (err) {
+    console.error('❌ Error tak terduga saat insert:', err);
+    res.status(500).json({ error: '❌ Gagal menambahkan data baru.' });
+  }
+});
+
+
+
+
 // UPDATE berdasarkan NIK
 router.put('/:nik', async (req, res) => {
   const { nik } = req.params;
@@ -177,9 +214,11 @@ router.post('/import/xlsx-fast', upload.single('file'), async (req, res) => {
     }
 
     const kolomValid = [
-      'nik', 'kk', 'nama', 'tempat_lahir', 'tanggal_lahir',
-      'jenis_kelamin', 'status', 'pekerjaan', 'alamat_dusun', 'desa', 'kode_desa'
-    ];
+          'nik', 'kk', 'nama', 'tempat_lahir', 'tanggal_lahir',
+          'jenis_kelamin', 'status', 'pekerjaan', 'alamat_dusun', 'desa', 'kode_desa',
+          'pendidikan', 'yatim_piatu', 'miskin_sangat', 'kategori_usia',
+          'hubungan_keluarga', 'status_rumah', 'kategori_mengaji', 'lokasi_mengaji'
+        ];
 
     const cleaned = records.map(row => {
       const bersih = {};
@@ -209,6 +248,17 @@ router.post('/import/xlsx-fast', upload.single('file'), async (req, res) => {
       row._tanggal_lahir_asli = row.tanggal_lahir;
       row.tanggal_lahir = hasilTgl.iso;
       row._tanggal_lahir_error = hasilTgl.error;
+
+      // 🆕 Normalisasi tambahan (tambahkan di sini)
+      row.yatim_piatu = normalisasiStatusYatim(row.yatim_piatu);
+      row.kategori_mengaji = normalisasiKategoriMengaji(row.kategori_mengaji);
+      row.status_rumah = normalisasiStatusRumah(row.status_rumah);
+      row.hubungan_keluarga = normalisasiUniversal(row.hubungan_keluarga);
+      row.pendidikan = normalisasiUniversal(row.pendidikan);
+      row.kategori_usia = normalisasiUniversal(row.kategori_usia);
+      row.miskin_sangat = normalisasiUniversal(row.miskin_sangat);
+      row.lokasi_mengaji = normalisasiUniversal(row.lokasi_mengaji);
+
 
 
       if (nikMap.has(nik)) {
@@ -338,6 +388,32 @@ router.get('/export/xlsx', async (req, res) => {
 });
 
 
+
+//DELETE TABASE
+// 🔥 HAPUS SELURUH DATA PENDUDUK
+router.delete('/hapus/semua', async (req, res) => {
+  try {
+    const { error } = await supabase
+      .from('penduduk')
+      .delete()
+      .neq('nik', ''); // menghindari .delete() tanpa kondisi yang ditolak oleh Supabase
+
+    if (error) {
+      console.error('❌ Gagal hapus semua:', error.message);
+      return res.status(500).json({ error: '❌ Gagal menghapus semua data penduduk.' });
+    }
+
+    res.json({ message: '✅ Seluruh data penduduk berhasil dihapus.' });
+
+  } catch (err) {
+    console.error('❌ Error server saat hapus semua:', err);
+    res.status(500).json({ error: '❌ Terjadi kesalahan saat menghapus semua data.' });
+  }
+});
+
+
+
+
 // GET dengan pagination, pencarian, dan filter
   router.get('/', async (req, res) => {
    const requestedLimit = parseInt(req.query.limit) || 20;
@@ -386,10 +462,28 @@ const to = ambilSemua ? limit - 1 : from + limit - 1;
     res.json({ data, total: count, page, limit });
   });
 
+//----
+// Ambil semua lokasi mengaji dari tabel_lokasimengaji
+router.get('/lokasi-mengaji', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('tabel_lokasimengaji')
+      .select('nama')
+      .order('nama');
 
- 
+    if (error) {
+      console.error('❌ Gagal ambil lokasi mengaji:', error.message);
+      return res.status(500).json({ error: 'Gagal mengambil data lokasi mengaji' });
+    }
 
+    res.json({ data });
+  } catch (err) {
+    console.error('❌ Error tak terduga:', err);
+    res.status(500).json({ error: 'Terjadi kesalahan saat mengambil lokasi mengaji' });
+  }
+});
 
+//----
 
 
 function normalisasiUniversal(str) {
@@ -413,6 +507,34 @@ function normalisasiUniversal(str) {
 
   return khususUppercase[hasil] || hasil;
 }
+//----
+function normalisasiStatusYatim(input) {
+  const val = (input || '').toString().trim().toUpperCase();
+  if (val.includes('YATIM') && val.includes('PIATU')) return 'YATIM PIATU';
+  if (val.includes('YATIM')) return 'YATIM';
+  if (val.includes('PIATU')) return 'PIATU';
+  if (val.includes('LENGKAP')) return 'LENGKAP';
+  return '';
+}
+
+function normalisasiKategoriMengaji(input) {
+  const val = (input || '').toString().trim().toUpperCase();
+  if (val.includes('DALAM')) return 'ANAK_DALAM';
+  if (val.includes('LUAR')) return 'ANAK_LUAR';
+  if (val.includes('GURU')) return 'GURU_MENGAJI';
+  return '';
+}
+
+function normalisasiStatusRumah(input) {
+  const val = (input || '').toString().trim().toUpperCase();
+  if (val.includes('NUMPANG')) return 'NUMPANG';
+  if (val.includes('SENDIRI')) return 'RUMAH SENDIRI';
+  return '';
+}
+//----
+
+
+
 
   
   return router;
