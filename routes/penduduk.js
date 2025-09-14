@@ -1,16 +1,10 @@
-import express from 'express';
-import { createClient } from '@supabase/supabase-js';
-import multer from 'multer';
-import XLSX from 'xlsx'; // jangan lupa ini
 
 
+import express from "express";
+import multer from "multer";
+import XLSX from "xlsx";
 
-export default function (SUPABASE_URL, SUPABASE_SERVICE_ROLE) {
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE) {
-    throw new Error("❌ SUPABASE_URL atau SUPABASE_SERVICE_ROLE belum di-set.");
-  }
-
-  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE);
+export default function (supabase) {
   const router = express.Router();
   const upload = multer({ storage: multer.memoryStorage() });
 
