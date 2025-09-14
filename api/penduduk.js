@@ -217,7 +217,7 @@ router.post('/import/xlsx-fast', upload.single('file'), async (req, res) => {
           'nik', 'kk', 'nama', 'tempat_lahir', 'tanggal_lahir',
           'jenis_kelamin', 'status', 'pekerjaan', 'alamat_dusun', 'desa', 'kode_desa',
           'pendidikan', 'yatim_piatu', 'miskin_sangat', 'kategori_usia',
-          'hubungan_keluarga', 'status_rumah', 'kategori_mengaji', 'lokasi_mengaji'
+          'hubungan_keluarga', 'status_rumah', 'kategori_mengaji', 'lokasi_mengaji','req_delete'
         ];
 
     const cleaned = records.map(row => {
@@ -258,6 +258,7 @@ router.post('/import/xlsx-fast', upload.single('file'), async (req, res) => {
       row.kategori_usia = normalisasiUniversal(row.kategori_usia);
       row.miskin_sangat = normalisasiUniversal(row.miskin_sangat);
       row.lokasi_mengaji = normalisasiUniversal(row.lokasi_mengaji);
+      row.req_delete = normalisasiUniversal(row.req_delete);
 
 
 
